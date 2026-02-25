@@ -226,28 +226,75 @@ curl http://localhost:8080/turnovers/{PROP-AFTER-id}/kpi
 
 Watch the logs as events propagate through the system in real time.
 
+**Step 1 — tenant leaves.** Copy the `id` from the response.
+
 ```bash
-# Step 1 — tenant leaves
-curl -X POST "http://localhost:8080/turnovers/moveout?propertyId=PROP-LIVE-1"
-# → log: [EVENT → tenant.moved-out]
-# → log: [WORK ORDER CREATED] type=INSPECTION sla=4h
+curl -s -X POST "http://localhost:8080/turnovers/moveout?propertyId=PROP-LIVE-1"
+```
+```json
+{ "id": "a1b2c3d4-...", "propertyId": "PROP-LIVE-1", "status": "IN_PROGRESS", ... }
+```
+```
+→ log: [EVENT → tenant.moved-out]
+→ log: [WORK ORDER CREATED] type=INSPECTION sla=4h
+```
 
-# Step 2 — list pending work orders
-curl http://localhost:8080/turnovers/{turnoverId}/workorders
+**Step 2 — list work orders.** Only INSPECTION exists at this point — CLEANING and REPAIR are gated behind it. Copy the INSPECTION work order `id`.
 
-# Step 3 — inspection team completes their report
-curl -X POST "http://localhost:8080/turnovers/{turnoverId}/workorders/{inspectionWoId}/complete"
-# → log: [EVENT → workorder.completed] type=INSPECTION
-# → log: [WORK ORDER CREATED] type=CLEANING sla=8h
-# → log: [WORK ORDER CREATED] type=REPAIR sla=24h   ← parallel fan-out
+```bash
+TURNOVER_ID="a1b2c3d4-..."   # from Step 1
 
-# Step 4 — cleaning and repair complete (order doesn't matter)
-curl -X POST "http://localhost:8080/turnovers/{turnoverId}/workorders/{cleaningWoId}/complete"
-curl -X POST "http://localhost:8080/turnovers/{turnoverId}/workorders/{repairWoId}/complete"
-# → log: [EVENT → property.ready-for-move-in] cycleTime=Xh
+curl -s "http://localhost:8080/turnovers/$TURNOVER_ID/workorders"
+```
+```json
+[
+  { "id": "f1e2d3c4-...", "type": "INSPECTION", "status": "PENDING", "slaDeadline": "..." }
+]
+```
 
-# Step 5 — final KPI report
-curl http://localhost:8080/turnovers/{turnoverId}/kpi
+**Step 3 — inspection team completes their report.** This fires `WorkOrderCompletedEvent`, which unlocks CLEANING and REPAIR in parallel. Copy both new IDs from Step 4.
+
+```bash
+INSPECTION_WO_ID="f1e2d3c4-..."   # from Step 2
+
+curl -s -X POST "http://localhost:8080/turnovers/$TURNOVER_ID/workorders/$INSPECTION_WO_ID/complete"
+```
+```
+→ log: [EVENT → workorder.completed] type=INSPECTION
+→ log: [WORK ORDER CREATED] type=CLEANING sla=8h
+→ log: [WORK ORDER CREATED] type=REPAIR   sla=24h  ← parallel fan-out
+```
+
+**Step 4 — list work orders again.** CLEANING and REPAIR now exist. Copy their IDs.
+
+```bash
+curl -s "http://localhost:8080/turnovers/$TURNOVER_ID/workorders"
+```
+```json
+[
+  { "id": "f1e2d3c4-...", "type": "INSPECTION", "status": "COMPLETED" },
+  { "id": "a9b8c7d6-...", "type": "CLEANING",   "status": "PENDING" },
+  { "id": "11223344-...", "type": "REPAIR",      "status": "PENDING" }
+]
+```
+
+**Step 5 — complete CLEANING and REPAIR** (order doesn't matter — they are independent).
+
+```bash
+CLEANING_WO_ID="a9b8c7d6-..."
+REPAIR_WO_ID="11223344-..."
+
+curl -s -X POST "http://localhost:8080/turnovers/$TURNOVER_ID/workorders/$CLEANING_WO_ID/complete"
+curl -s -X POST "http://localhost:8080/turnovers/$TURNOVER_ID/workorders/$REPAIR_WO_ID/complete"
+```
+```
+→ log: [EVENT → property.ready-for-move-in] cycleTime=Xh
+```
+
+**Step 6 — final KPI report.**
+
+```bash
+curl -s "http://localhost:8080/turnovers/$TURNOVER_ID/kpi"
 ```
 
 ### 5. Generate named scenario snapshots on demand

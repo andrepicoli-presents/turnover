@@ -12,7 +12,7 @@ public class WorkOrder {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+    private UUID id;
 
     private UUID turnoverId;
 
@@ -26,11 +26,11 @@ public class WorkOrder {
     private LocalDateTime slaDeadline;
     private LocalDateTime completedAt;
 
-    public String getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

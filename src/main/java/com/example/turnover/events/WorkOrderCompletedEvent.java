@@ -14,10 +14,10 @@ import java.util.UUID;
 public class WorkOrderCompletedEvent {
 
     private final UUID turnoverId;
-    private final String workOrderId;
+    private final UUID workOrderId;
     private final WorkOrderType type;
 
-    public WorkOrderCompletedEvent(UUID turnoverId, String workOrderId, WorkOrderType type) {
+    public WorkOrderCompletedEvent(UUID turnoverId, UUID workOrderId, WorkOrderType type) {
         this.turnoverId = turnoverId;
         this.workOrderId = workOrderId;
         this.type = type;
@@ -27,7 +27,7 @@ public class WorkOrderCompletedEvent {
         return turnoverId;
     }
 
-    public String getWorkOrderId() {
+    public UUID getWorkOrderId() {
         return workOrderId;
     }
 
